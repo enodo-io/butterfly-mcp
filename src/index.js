@@ -10,6 +10,7 @@ import {
   INLINE_NODES,
   BODY_SHAPE_SUMMARY,
 } from "./blockCatalog.js";
+import { bodySchema } from "./bodySchema.js";
 import { markdownToButterfly } from "./markdownToButterfly.js";
 
 // Load .env from the subprocess cwd (= the project root when launched by a
@@ -493,11 +494,10 @@ server.tool(
       .describe(
         'Content type — the post\'s *kind* (e.g. "article", "page"). Exactly one per post, required. Must match a type slug from list_types / get_property_context.',
       ),
-    body: z
-      .array(z.any())
+    body: bodySchema
       .optional()
       .describe(
-        "Ordered array of butterfly blocks. Block types include paragraph, heading, image, video, audio, gallery, quote, faq, related. Leave empty to create a blank draft a human will fill in via the semantic editor.",
+        "Ordered array of butterfly blocks. Block types include paragraph, heading, image, video, audio, gallery, quote, faq, related. Leave empty to create a blank draft a human will fill in via the semantic editor. Validated strictly against the butterfly grammar — call list_block_types if you need the exact shape for any block or inline node.",
       ),
     status: z
       .enum(["draft", "published", "planned", "awaiting_approval", "approved"])
@@ -653,11 +653,10 @@ server.tool(
       .describe(
         "Change the post's content type (by id). Omit to keep the current one.",
       ),
-    body: z
-      .array(z.any())
+    body: bodySchema
       .optional()
       .describe(
-        "Replaces the post body. Server converts to the semantic editor shape and pushes a new fs revision.",
+        "Replaces the post body. Server converts to the semantic editor shape and pushes a new fs revision. Validated strictly against the butterfly grammar.",
       ),
     status: z
       .enum(["draft", "published", "planned", "awaiting_approval", "approved"])
