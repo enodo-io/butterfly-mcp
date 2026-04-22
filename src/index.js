@@ -429,7 +429,11 @@ server.tool(
   "List categories. Admin key includes categories with no attached posts.",
   { search: z.string().optional() },
   ({ search }) =>
-    wrap(get("/v1/categories", search ? { "filter[query]": search } : {})),
+    wrap(
+      get("/v1/categories", search ? { "filter[query]": search } : {}, {
+        scope: "admin",
+      }),
+    ),
 );
 
 server.tool(
@@ -920,7 +924,7 @@ server.tool(
 
 server.tool(
   "update_category",
-  "Update a category.",
+  "Update a category. Pass restore=true to undo a prior soft-delete (brings the category back into the live list).",
   {
     category_id: z.number().int(),
     name: z.string().optional(),
@@ -928,12 +932,19 @@ server.tool(
     parent_category: z.number().int().nullable().optional(),
     thumbnail_media_id: z.number().int().nullable().optional(),
     custom: z.record(z.any()).optional(),
+    restore: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, clears the soft-delete flag on the category so it reappears in listings. Leave unset to keep the current state.",
+      ),
   },
   (input) => {
     const data = { attributes: {} };
     for (const k of ["name", "description", "custom"]) {
       if (input[k] !== undefined) data.attributes[k] = input[k];
     }
+    if (input.restore === true) data.attributes.disable = false;
     const rel = {};
     if (input.parent_category !== undefined) {
       rel.parentCategory = {
