@@ -503,7 +503,21 @@ server.tool(
       .enum(["draft", "published", "planned", "awaiting_approval", "approved"])
       .optional()
       .describe(
-        'Defaults to draft. Set to "published" to publish immediately.',
+        'Defaults to draft. "published" publishes immediately (publishedAt = now if omitted). "planned" schedules publication at published_at (must be in the future).',
+      ),
+    published_at: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Publication timestamp (ISO 8601, UTC). Only meaningful for status=published or status=planned. Use a future value to schedule a `planned` post. Drives sortedDate / updatedAt on the post row and the public publish date shown to readers.",
+      ),
+    due_at: z
+      .string()
+      .datetime()
+      .optional()
+      .describe(
+        "Internal delivery deadline (ISO 8601, UTC) for non-published statuses (draft / awaiting_approval / approved). Used by editorial listings; never shown publicly. Ignored for published/planned — those use published_at.",
       ),
     category: idOrSlug
       .optional()
@@ -607,6 +621,8 @@ server.tool(
     };
     if (input.body) attributes.body = input.body;
     if (input.flags) attributes.flags = input.flags;
+    if (input.published_at !== undefined) attributes.publishedAt = input.published_at;
+    if (input.due_at !== undefined) attributes.dueAt = input.due_at;
     if (input.keyphrase !== undefined) attributes.keyphrase = input.keyphrase;
     if (input.keywords !== undefined) attributes.keywords = input.keywords;
     if (input.questions !== undefined) attributes.questions = input.questions;
@@ -661,6 +677,22 @@ server.tool(
     status: z
       .enum(["draft", "published", "planned", "awaiting_approval", "approved"])
       .optional(),
+    published_at: z
+      .string()
+      .datetime()
+      .nullable()
+      .optional()
+      .describe(
+        "Publication timestamp (ISO 8601, UTC). Only meaningful for status=published or status=planned (future value = scheduled). Pass null to clear — useful when moving a post back to draft. Drives sortedDate / updatedAt and the public publish date.",
+      ),
+    due_at: z
+      .string()
+      .datetime()
+      .nullable()
+      .optional()
+      .describe(
+        "Internal delivery deadline (ISO 8601, UTC) for non-published statuses. Pass null to clear. Ignored for published/planned.",
+      ),
     category: idOrSlug
       .nullable()
       .optional()
@@ -736,6 +768,8 @@ server.tool(
     if (input.flags !== undefined) attributes.flags = input.flags;
     if (input.canonical !== undefined) attributes.canonical = input.canonical;
     if (input.body !== undefined) attributes.body = input.body;
+    if (input.published_at !== undefined) attributes.publishedAt = input.published_at;
+    if (input.due_at !== undefined) attributes.dueAt = input.due_at;
 
     const relationships = {};
     if (input.category !== undefined) {
