@@ -713,6 +713,12 @@ server.tool(
     hreflangs: z.record(z.string()).optional(),
     custom: z.record(z.any()).optional(),
     private: z.boolean().optional(),
+    silent: z
+      .boolean()
+      .optional()
+      .describe(
+        "Stealth edit — skip bumping updatedAt. Use when fixing a typo or backfilling metadata that shouldn't surface the post in \"recently edited\" listings or re-trigger downstream consumers that key on updatedAt. Default false.",
+      ),
     keyphrase: z
       .string()
       .optional()
@@ -797,9 +803,12 @@ server.tool(
       };
     }
 
+    const data = { attributes, relationships };
+    if (input.silent) data.meta = { silent: true };
+
     return wrap(
       patch(`/v1/posts/${input.post_id}`, {
-        data: { attributes, relationships },
+        data,
       }),
     );
   },
