@@ -305,8 +305,6 @@ server.tool(
         name: t.attributes?.name,
         description: t.attributes?.description,
         targets: t.attributes?.targets,
-        iconName: t.attributes?.iconName,
-        config: t.attributes?.config,
       })),
     };
 
@@ -1594,7 +1592,7 @@ server.tool(
 
 server.tool(
   "list_block_templates",
-  "List the per-property catalog of named block templates (admin only). Each template carries a free-form `config` bag, an optional `iconName` from the shared icon registry, and a list of stylable block types (`targets`) it can be applied to. Reference one from a body block via `template: '<key>'`.",
+  "List the per-property catalog of named block templates (admin only). Each template carries a name, a description and a list of stylable block types (`targets`) it can be applied to. Reference one from a body block via `template: '<key>'` — the rendering site decides what the variant looks like.",
   {},
   () =>
     wrap(
@@ -1614,24 +1612,13 @@ server.tool(
 
 server.tool(
   "create_block_template",
-  `Create a named template variant for one or several stylable blocks (e.g. callout, title with icon). Allowed targets: ${STYLABLE_BLOCK_TYPES.join(", ")}.`,
+  `Create a named template variant for one or several stylable blocks (e.g. callout). Allowed targets: ${STYLABLE_BLOCK_TYPES.join(", ")}. The site rendering the post is free to interpret the template key however it wants — Butterfly itself stores nothing about how the variant should look.`,
   {
     name: z.string().describe("Display name. Required."),
     targets: z
       .array(z.enum(STYLABLE_BLOCK_TYPES))
       .min(1)
       .describe("Block types this template can be applied to."),
-    config: z
-      .record(z.any())
-      .describe(
-        "Free-form configuration bag interpreted by the editor and renderer. Use {} for empty.",
-      ),
-    iconName: z
-      .string()
-      .optional()
-      .describe(
-        "Optional. Name from the shared icon registry (e.g. 'bell', 'help').",
-      ),
     key: z
       .string()
       .optional()
@@ -1645,18 +1632,16 @@ server.tool(
 
 server.tool(
   "update_block_template",
-  "Update a block template by key. The key is immutable; any subset of name, description, targets, iconName, config can be patched.",
+  "Update a block template by key. The key is immutable; any subset of name, description, targets can be patched.",
   {
     key: z.string().describe("The blocktemplate key."),
     name: z.string().optional(),
     description: z.string().optional(),
     targets: z.array(z.enum(STYLABLE_BLOCK_TYPES)).min(1).optional(),
-    iconName: z.string().nullable().optional(),
-    config: z.record(z.any()).optional(),
   },
   (input) => {
     const attributes = {};
-    for (const k of ["name", "description", "targets", "iconName", "config"]) {
+    for (const k of ["name", "description", "targets"]) {
       if (input[k] !== undefined) attributes[k] = input[k];
     }
     return wrap(
