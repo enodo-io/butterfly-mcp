@@ -69,6 +69,13 @@ const inlineNode = z.lazy(() =>
         value: inlineField,
       })
       .strict(),
+    z
+      .object({
+        type: z.literal("customstyle"),
+        key: z.string().min(1),
+        value: inlineField,
+      })
+      .strict(),
     z.object({ type: z.literal("break") }).strict(),
   ]),
 );
@@ -103,13 +110,12 @@ const tableCell = z
 
 const tableRows = z.array(z.array(tableCell));
 
-// Optional style + template slugs available on any stylable block. Unknown /
-// orphaned slugs are accepted at the schema layer and rejected (or silently
-// dropped at render time) by the API and the editor — same policy as a
-// post-write delete of a customstyle / blocktemplate. Excluded block types:
-// iframe, embed, and platform embeds (youtube/x/tiktok/...).
+// Optional block-level template slug available on any block that admits a
+// blocktemplate annotation. Unknown / orphaned slugs are accepted at the
+// schema layer and rejected (or silently dropped at render time) by the API
+// and the editor. Custom styles are inline marks now, applied at the inline
+// level via the `customstyle` wrapper node — see `inlineNode` below.
 const stylableFields = {
-  style: z.string().optional(),
   template: z.string().optional(),
 };
 

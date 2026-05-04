@@ -1472,7 +1472,8 @@ server.tool(
 
 // ── Custom styles & block templates ────────────────────────────────────
 
-const STYLABLE_BLOCK_TYPES = [
+// Block types a `template` (block-level annotation) may apply to.
+const TEMPLATEABLE_BLOCK_TYPES = [
   "paragraph",
   "quote",
   "title2",
@@ -1494,6 +1495,20 @@ const STYLABLE_BLOCK_TYPES = [
   "table",
   "related",
 ];
+
+// Block types whose inline payload can be wrapped with a customstyle mark.
+const INLINE_CAPABLE_BLOCK_TYPES = [
+  "paragraph",
+  "quote",
+  "bulletList",
+  "orderedList",
+  "reversedList",
+  "faq",
+  "table",
+];
+
+// Backwards-compat alias for blocktemplate tools.
+const STYLABLE_BLOCK_TYPES = TEMPLATEABLE_BLOCK_TYPES;
 
 const ALLOWED_CSS_PROPS = [
   "color",
@@ -1523,7 +1538,7 @@ const styleCssSchema = z
 
 server.tool(
   "list_custom_styles",
-  "List the per-property catalog of named custom styles (admin only). Each style carries a whitelisted CSS bag and a list of stylable block types (`targets`) it can be applied to. Reference one from a body block via `style: '<key>'`.",
+  "List the per-property catalog of named custom styles (admin only). Custom styles are inline marks (like bold / italic) applied to a substring of a text-bearing block. Each style carries a whitelisted CSS bag and a list of inline-capable block types (`targets`) it can be applied within. Wrap the styled substring with a `customstyle` inline node: { type: 'customstyle', key: '<slug>', value: ... }.",
   {},
   () =>
     wrap(get("/v1/customstyles", { "page[size]": 100 }, { scope: "admin" })),
@@ -1539,13 +1554,13 @@ server.tool(
 
 server.tool(
   "create_custom_style",
-  `Create a named custom style applicable to one or several stylable block types. Allowed targets: ${STYLABLE_BLOCK_TYPES.join(", ")}. Allowed CSS keys: ${ALLOWED_CSS_PROPS.join(", ")}.`,
+  `Create a named custom style. Custom styles are inline marks applied within a substring of a text-bearing block. Allowed targets: ${INLINE_CAPABLE_BLOCK_TYPES.join(", ")}. Allowed CSS keys: ${ALLOWED_CSS_PROPS.join(", ")}.`,
   {
     name: z.string().describe("Display name. Required."),
     targets: z
-      .array(z.enum(STYLABLE_BLOCK_TYPES))
+      .array(z.enum(INLINE_CAPABLE_BLOCK_TYPES))
       .min(1)
-      .describe("Block types this style can be applied to."),
+      .describe("Block types whose inline content this style can wrap."),
     css: styleCssSchema.describe(
       "Whitelisted CSS bag — at least one property required.",
     ),
@@ -1567,7 +1582,7 @@ server.tool(
     key: z.string().describe("The customstyle key."),
     name: z.string().optional(),
     description: z.string().optional(),
-    targets: z.array(z.enum(STYLABLE_BLOCK_TYPES)).min(1).optional(),
+    targets: z.array(z.enum(INLINE_CAPABLE_BLOCK_TYPES)).min(1).optional(),
     css: styleCssSchema.optional(),
   },
   (input) => {
