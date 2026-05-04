@@ -238,15 +238,26 @@ server.tool(
 
 server.tool(
   "get_property_context",
-  "Snapshot of the property's taxonomy of content: available types, flags, taxonomies (with their terms), and top categories. Call this first so you can pick valid values before creating or updating a post.",
+  "Snapshot of the property's taxonomy of content: available types, flags, taxonomies (with their terms), top categories, plus the catalog of named custom styles and block templates that can decorate a post body. Call this first so you can pick valid values before creating or updating a post.",
   {},
   async () => {
-    const [types, flags, taxonomies, categories] = await Promise.all([
-      get("/v1/types").catch(() => ({ data: [] })),
-      get("/v1/flags").catch(() => ({ data: [] })),
-      get("/v1/taxonomies").catch(() => ({ data: [] })),
-      get("/v1/categories", { "page[size]": 100 }).catch(() => ({ data: [] })),
-    ]);
+    const [types, flags, taxonomies, categories, customstyles, blocktemplates] =
+      await Promise.all([
+        get("/v1/types").catch(() => ({ data: [] })),
+        get("/v1/flags").catch(() => ({ data: [] })),
+        get("/v1/taxonomies").catch(() => ({ data: [] })),
+        get("/v1/categories", { "page[size]": 100 }).catch(() => ({
+          data: [],
+        })),
+        get("/v1/customstyles", { "page[size]": 100 }, { scope: "admin" }).catch(
+          () => ({ data: [] }),
+        ),
+        get(
+          "/v1/blocktemplates",
+          { "page[size]": 100 },
+          { scope: "admin" },
+        ).catch(() => ({ data: [] })),
+      ]);
 
     const taxList = taxonomies?.data || [];
     const termsByTax = await Promise.all(
@@ -281,6 +292,21 @@ server.tool(
         name: c.attributes?.name,
         slug: c.attributes?.slug,
         path: c.attributes?.path,
+      })),
+      customstyles: (customstyles.data || []).map((s) => ({
+        key: s.id,
+        name: s.attributes?.name,
+        description: s.attributes?.description,
+        targets: s.attributes?.targets,
+        css: s.attributes?.css,
+      })),
+      blocktemplates: (blocktemplates.data || []).map((t) => ({
+        key: t.id,
+        name: t.attributes?.name,
+        description: t.attributes?.description,
+        targets: t.attributes?.targets,
+        iconName: t.attributes?.iconName,
+        config: t.attributes?.config,
       })),
     };
 
@@ -1444,6 +1470,208 @@ server.tool(
   "Delete a custom setting by key.",
   { key: z.string() },
   ({ key }) => wrap(del(`/v1/custom/${encodeURIComponent(key)}`)),
+);
+
+// ── Custom styles & block templates ────────────────────────────────────
+
+const STYLABLE_BLOCK_TYPES = [
+  "paragraph",
+  "quote",
+  "title2",
+  "title3",
+  "title4",
+  "title5",
+  "title6",
+  "bulletList",
+  "orderedList",
+  "reversedList",
+  "code",
+  "markdown",
+  "pagebreak",
+  "image",
+  "video",
+  "audio",
+  "gallery",
+  "faq",
+  "table",
+  "related",
+];
+
+const ALLOWED_CSS_PROPS = [
+  "color",
+  "backgroundColor",
+  "fontWeight",
+  "fontStyle",
+  "fontFamily",
+  "fontSize",
+  "textTransform",
+  "letterSpacing",
+  "textDecoration",
+];
+
+const styleCssSchema = z
+  .object({
+    color: z.string().optional(),
+    backgroundColor: z.string().optional(),
+    fontWeight: z.union([z.string(), z.number()]).optional(),
+    fontStyle: z.string().optional(),
+    fontFamily: z.string().optional(),
+    fontSize: z.string().optional(),
+    textTransform: z.string().optional(),
+    letterSpacing: z.string().optional(),
+    textDecoration: z.string().optional(),
+  })
+  .strict();
+
+server.tool(
+  "list_custom_styles",
+  "List the per-property catalog of named custom styles (admin only). Each style carries a whitelisted CSS bag and a list of stylable block types (`targets`) it can be applied to. Reference one from a body block via `style: '<key>'`.",
+  {},
+  () =>
+    wrap(get("/v1/customstyles", { "page[size]": 100 }, { scope: "admin" })),
+);
+
+server.tool(
+  "get_custom_style",
+  "Read one custom style by key (admin only).",
+  { key: z.string() },
+  ({ key }) =>
+    wrap(get(`/v1/customstyles/${encodeURIComponent(key)}`, {}, { scope: "admin" })),
+);
+
+server.tool(
+  "create_custom_style",
+  `Create a named custom style applicable to one or several stylable block types. Allowed targets: ${STYLABLE_BLOCK_TYPES.join(", ")}. Allowed CSS keys: ${ALLOWED_CSS_PROPS.join(", ")}.`,
+  {
+    name: z.string().describe("Display name. Required."),
+    targets: z
+      .array(z.enum(STYLABLE_BLOCK_TYPES))
+      .min(1)
+      .describe("Block types this style can be applied to."),
+    css: styleCssSchema.describe(
+      "Whitelisted CSS bag — at least one property required.",
+    ),
+    key: z
+      .string()
+      .optional()
+      .describe(
+        "Optional. Slugified from `name` if omitted. Immutable after creation.",
+      ),
+    description: z.string().optional(),
+  },
+  (input) => wrap(post("/v1/customstyles/", { data: { attributes: input } })),
+);
+
+server.tool(
+  "update_custom_style",
+  "Update a custom style by key. The key is immutable; any subset of name, description, targets, css can be patched.",
+  {
+    key: z.string().describe("The customstyle key."),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    targets: z.array(z.enum(STYLABLE_BLOCK_TYPES)).min(1).optional(),
+    css: styleCssSchema.optional(),
+  },
+  (input) => {
+    const attributes = {};
+    for (const k of ["name", "description", "targets", "css"]) {
+      if (input[k] !== undefined) attributes[k] = input[k];
+    }
+    return wrap(
+      patch(`/v1/customstyles/${encodeURIComponent(input.key)}`, {
+        data: { attributes },
+      }),
+    );
+  },
+);
+
+server.tool(
+  "delete_custom_style",
+  "Delete a custom style by key. Posts that referenced it keep the orphan slug; renderers ignore it.",
+  { key: z.string() },
+  ({ key }) => wrap(del(`/v1/customstyles/${encodeURIComponent(key)}`)),
+);
+
+server.tool(
+  "list_block_templates",
+  "List the per-property catalog of named block templates (admin only). Each template carries a free-form `config` bag, an optional `iconName` from the shared icon registry, and a list of stylable block types (`targets`) it can be applied to. Reference one from a body block via `template: '<key>'`.",
+  {},
+  () =>
+    wrap(
+      get("/v1/blocktemplates", { "page[size]": 100 }, { scope: "admin" }),
+    ),
+);
+
+server.tool(
+  "get_block_template",
+  "Read one block template by key (admin only).",
+  { key: z.string() },
+  ({ key }) =>
+    wrap(
+      get(`/v1/blocktemplates/${encodeURIComponent(key)}`, {}, { scope: "admin" }),
+    ),
+);
+
+server.tool(
+  "create_block_template",
+  `Create a named template variant for one or several stylable blocks (e.g. callout, title with icon). Allowed targets: ${STYLABLE_BLOCK_TYPES.join(", ")}.`,
+  {
+    name: z.string().describe("Display name. Required."),
+    targets: z
+      .array(z.enum(STYLABLE_BLOCK_TYPES))
+      .min(1)
+      .describe("Block types this template can be applied to."),
+    config: z
+      .record(z.any())
+      .describe(
+        "Free-form configuration bag interpreted by the editor and renderer. Use {} for empty.",
+      ),
+    iconName: z
+      .string()
+      .optional()
+      .describe(
+        "Optional. Name from the shared icon registry (e.g. 'bell', 'help').",
+      ),
+    key: z
+      .string()
+      .optional()
+      .describe(
+        "Optional. Slugified from `name` if omitted. Immutable after creation.",
+      ),
+    description: z.string().optional(),
+  },
+  (input) => wrap(post("/v1/blocktemplates/", { data: { attributes: input } })),
+);
+
+server.tool(
+  "update_block_template",
+  "Update a block template by key. The key is immutable; any subset of name, description, targets, iconName, config can be patched.",
+  {
+    key: z.string().describe("The blocktemplate key."),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    targets: z.array(z.enum(STYLABLE_BLOCK_TYPES)).min(1).optional(),
+    iconName: z.string().nullable().optional(),
+    config: z.record(z.any()).optional(),
+  },
+  (input) => {
+    const attributes = {};
+    for (const k of ["name", "description", "targets", "iconName", "config"]) {
+      if (input[k] !== undefined) attributes[k] = input[k];
+    }
+    return wrap(
+      patch(`/v1/blocktemplates/${encodeURIComponent(input.key)}`, {
+        data: { attributes },
+      }),
+    );
+  },
+);
+
+server.tool(
+  "delete_block_template",
+  "Delete a block template by key. Posts that referenced it keep the orphan slug; renderers ignore it.",
+  { key: z.string() },
+  ({ key }) => wrap(del(`/v1/blocktemplates/${encodeURIComponent(key)}`)),
 );
 
 // ── Run ────────────────────────────────────────────────────────────────

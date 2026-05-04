@@ -103,8 +103,18 @@ const tableCell = z
 
 const tableRows = z.array(z.array(tableCell));
 
+// Optional style + template slugs available on any stylable block. Unknown /
+// orphaned slugs are accepted at the schema layer and rejected (or silently
+// dropped at render time) by the API and the editor — same policy as a
+// post-write delete of a customstyle / blocktemplate. Excluded block types:
+// iframe, embed, and platform embeds (youtube/x/tiktok/...).
+const stylableFields = {
+  style: z.string().optional(),
+  template: z.string().optional(),
+};
+
 const heading = (level) =>
-  z.object({ type: z.literal(level), data: z.string() }).strict();
+  z.object({ type: z.literal(level), data: z.string(), ...stylableFields }).strict();
 
 // BulletList/OrderedList/ReversedList.data = (string | InlineNode[])[] —
 // each list item is normalized to InlineNode[].
@@ -113,11 +123,14 @@ const list = (level) =>
     .object({
       type: z.literal(level),
       data: z.array(inlineField),
+      ...stylableFields,
     })
     .strict();
 
 const blockNode = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("paragraph"), data: inlineField }).strict(),
+  z
+    .object({ type: z.literal("paragraph"), data: inlineField, ...stylableFields })
+    .strict(),
   heading("title2"),
   heading("title3"),
   heading("title4"),
@@ -142,6 +155,7 @@ const blockNode = z.discriminatedUnion("type", [
             .optional(),
         })
         .strict(),
+      ...stylableFields,
     })
     .strict(),
   z
@@ -153,15 +167,30 @@ const blockNode = z.discriminatedUnion("type", [
           language: z.string().optional(),
         })
         .strict(),
+      ...stylableFields,
     })
     .strict(),
-  z.object({ type: z.literal("markdown"), data: z.string() }).strict(),
+  z
+    .object({ type: z.literal("markdown"), data: z.string(), ...stylableFields })
+    .strict(),
   z.object({ type: z.literal("embed"), data: z.string() }).strict(),
-  z.object({ type: z.literal("pagebreak") }).strict(),
-  z.object({ type: z.literal("image"), data: mediaData }).strict(),
-  z.object({ type: z.literal("video"), data: mediaData }).strict(),
-  z.object({ type: z.literal("audio"), data: mediaData }).strict(),
-  z.object({ type: z.literal("gallery"), data: z.array(mediaData) }).strict(),
+  z.object({ type: z.literal("pagebreak"), ...stylableFields }).strict(),
+  z
+    .object({ type: z.literal("image"), data: mediaData, ...stylableFields })
+    .strict(),
+  z
+    .object({ type: z.literal("video"), data: mediaData, ...stylableFields })
+    .strict(),
+  z
+    .object({ type: z.literal("audio"), data: mediaData, ...stylableFields })
+    .strict(),
+  z
+    .object({
+      type: z.literal("gallery"),
+      data: z.array(mediaData),
+      ...stylableFields,
+    })
+    .strict(),
   z
     .object({
       type: z.literal("faq"),
@@ -171,6 +200,7 @@ const blockNode = z.discriminatedUnion("type", [
           value: inlineField,
         })
         .strict(),
+      ...stylableFields,
     })
     .strict(),
   z
@@ -204,6 +234,7 @@ const blockNode = z.discriminatedUnion("type", [
           foot: tableRows.optional(),
         })
         .strict(),
+      ...stylableFields,
     })
     .strict(),
   z
@@ -218,6 +249,7 @@ const blockNode = z.discriminatedUnion("type", [
           })
           .strict(),
       ),
+      ...stylableFields,
     })
     .strict(),
 ]);
