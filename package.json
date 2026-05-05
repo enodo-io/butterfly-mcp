@@ -2,9 +2,12 @@
   "name": "@enodo/butterfly-mcp",
   "version": "0.1.0",
   "description": "MCP server that exposes the Butterfly headless CMS (via the Butterfly API) as tools for LLM agents.",
-  "license": "UNLICENSED",
-  "private": true,
+  "license": "MIT",
   "type": "module",
+  "files": [
+    "src",
+    "README.md"
+  ],
   "homepage": "https://github.com/enodo-io/butterfly-mcp#readme",
   "repository": {
     "type": "git",

@@ -27,27 +27,7 @@ The server uses the stdio MCP transport and just waits for a client to connect �
 
 ## Team setup (recommended)
 
-Goal: each web project has its own `.mcp.json` that everyone on the team can share without hard-coding your local path to the repo.
-
-### Once per machine
-
-Clone this repo and register the binary globally:
-
-```bash
-git clone git@github.com:enodo-io/butterfly-mcp.git
-cd butterfly-mcp
-npm install
-npm link
-```
-
-`npm link` uses the `bin` declaration in `package.json` to create a `butterfly-mcp` executable in your npm global prefix — wherever you cloned the repo, the command is now in your `$PATH`.
-
-Verify:
-
-```bash
-which butterfly-mcp
-butterfly-mcp --help  # should just run (no help output — MCP server waits on stdio)
-```
+Goal: each web project has its own `.mcp.json` that everyone on the team can share, with zero install step on each machine and automatic updates.
 
 ### Once per project (committed to git)
 
@@ -61,11 +41,14 @@ Add `.mcp.json` at the root of each project that consumes the MCP:
 {
   "mcpServers": {
     "butterfly": {
-      "command": "butterfly-mcp"
+      "command": "npx",
+      "args": ["-y", "@enodo/butterfly-mcp@latest"]
     }
   }
 }
 ```
+
+`npx -y` auto-accepts the install prompt on first run; `@latest` makes npx check the registry on every server start, so teammates always get the newest published version with no action on their side. (Trade-off: adds ~1–3 s to startup. Pin a specific version like `@enodo/butterfly-mcp@0.2.0` if you'd rather opt in to upgrades manually.)
 
 And a local, untracked `.env` next to it (add `.env` to `.gitignore`):
 
@@ -91,7 +74,8 @@ Every MCP client passes the `env:` block on an entry into the subprocess's envir
 {
   "mcpServers": {
     "butterfly": {
-      "command": "butterfly-mcp",
+      "command": "npx",
+      "args": ["-y", "@enodo/butterfly-mcp@latest"],
       "env": {
         "PUBLIC_API_URL": "https://1234.pubbtf.eno.do",
         "PUBLIC_API_KEY": "<public key>",
@@ -108,14 +92,16 @@ This is also how you point several butterfly instances at distinct properties fr
 {
   "mcpServers": {
     "butterfly-prod": {
-      "command": "butterfly-mcp",
+      "command": "npx",
+      "args": ["-y", "@enodo/butterfly-mcp@latest"],
       "env": {
         "PUBLIC_API_URL": "https://prod.pubbtf.eno.do",
         "PRIVATE_API_KEY": "<prod key>"
       }
     },
     "butterfly-staging": {
-      "command": "butterfly-mcp",
+      "command": "npx",
+      "args": ["-y", "@enodo/butterfly-mcp@latest"],
       "env": {
         "PUBLIC_API_URL": "https://staging.pubbtf.eno.do",
         "PRIVATE_API_KEY": "<staging key>"
