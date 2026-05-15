@@ -89,10 +89,14 @@ const mediaData = z
   })
   .strict();
 
+// Public API enriches `oembed` server-side from `url` via oembed.eno.do
+// using IAM_GOD_TOKEN, so the LLM only has to supply the URL. Callers
+// may still pass a pre-fetched `oembed` payload — in that case the API
+// trusts it and skips the lookup.
 const oembedData = z
   .object({
     url: z.string(),
-    oembed: z.record(z.any()),
+    oembed: z.record(z.any()).optional(),
   })
   .strict();
 
